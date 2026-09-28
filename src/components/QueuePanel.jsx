@@ -40,12 +40,6 @@ function clamp(n, min, max) {
   return Math.min(max, Math.max(min, value));
 }
 
-function asChannelId(value) {
-  const id = Number(value);
-  if (!Number.isInteger(id) || id < 0 || id >= CHANNEL_COUNT) return null;
-  return id;
-}
-
 function asTime(value) {
   if (value == null || value === '') return null;
   const date = value instanceof Date ? value : new Date(value);
@@ -66,14 +60,25 @@ function formatRelative(value) {
   return `${Math.floor(hr / 24)} 天前`;
 }
 
+function asChannelId(value) {
+  const id = Number(value);
+  if (!Number.isInteger(id) || id < 0 || id >= CHANNEL_COUNT) return null;
+  return id;
+}
+
 function taskTitle(task) {
   const payload = task?.payload;
   if (payload && typeof payload === 'object') {
-    const fromPayload = payload.title || payload.name || payload.filename || payload.prompt || payload.label || payload.jobName;
+    const fromPayload =
+      payload.title ||
+      payload.name ||
+      payload.filename ||
+      payload.prompt ||
+      payload.label ||
+      payload.jobName;
     if (fromPayload) return fromPayload;
-  } else if (typeof payload === 'string' && payload.trim()) {
-    return payload;
   }
+  if (typeof payload === 'string' && payload.trim()) return payload;
   if (task?.title) return task.title;
   const id = String(task?.id || '');
   return id ? `任務 ${id.slice(0, 8)}` : '未命名任務';
@@ -475,10 +480,6 @@ export default function QueuePanel({
   }, [onRetry, unmanaged, markPending]);
 
   const names = Array.from({ length: CHANNEL_COUNT }, (_, index) => channelNames[index] || `通道 ${index}`);
-  const nameOf = (channelId) => {
-    const id = asChannelId(channelId);
-    return id == null ? '未知通道' : names[id];
-  };
 
   return (
     <section className={`qp-panel ${className}`.trim()} aria-labelledby="qp-panel-title">
@@ -527,7 +528,7 @@ export default function QueuePanel({
             <ul className="qp-list">
               {resolvedFailed.map((task) => (
                 <li key={task.id}>
-                  <TaskRow task={task} channelName={nameOf(task.channelId)} pending={pendingIds.has(task.id)} showRetry={canRetry} onRetry={handleRetry} />
+                  <TaskRow task={task} channelName={names[asChannelId(task.channelId) ?? 0]} pending={pendingIds.has(task.id)} showRetry={canRetry} onRetry={handleRetry} />
                 </li>
               ))}
             </ul>
@@ -542,7 +543,7 @@ export default function QueuePanel({
             <ul className="qp-list">
               {resolvedSucceeded.slice(0, 8).map((task) => (
                 <li key={task.id}>
-                  <TaskRow task={task} channelName={nameOf(task.channelId)} />
+                  <TaskRow task={task} channelName={names[asChannelId(task.channelId) ?? 0]} />
                 </li>
               ))}
             </ul>
