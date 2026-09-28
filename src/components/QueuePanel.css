@@ -1,4 +1,4 @@
-/* QueuePanel — 專屬樣式。所有選擇器以 qp- 為前綴，避免污染其他分支。 */
+/* QueuePanel — dedicated styles. All selectors use the qp- prefix. */
 
 .qp-panel {
   --qp-bg: #0b0c0e;
@@ -50,6 +50,11 @@
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 16px;
+}
+
+.qp-hero__copy,
+.qp-channel__copy {
+  min-width: 0;
 }
 
 .qp-kicker {
@@ -202,7 +207,8 @@
   background: var(--qp-elevated);
 }
 
-.qp-channel--busy {
+.qp-channel--busy,
+.qp-channel[open] {
   border-color: rgba(142, 160, 181, 0.38);
 }
 
@@ -217,8 +223,10 @@
   list-style: none;
 }
 
-.qp-channel__summary::-webkit-details-marker {
+.qp-channel__summary::-webkit-details-marker,
+.qp-channel__summary::marker {
   display: none;
+  content: none;
 }
 
 .qp-channel__id {
@@ -438,6 +446,11 @@
   cursor: pointer;
 }
 
+.qp-btn:hover:not(:disabled) {
+  border-color: rgba(143, 184, 181, 0.45);
+  background: rgba(255, 255, 255, 0.04);
+}
+
 .qp-btn:disabled {
   cursor: not-allowed;
   opacity: 0.55;
@@ -452,6 +465,10 @@
   border-color: rgba(143, 184, 181, 0.4);
   background: rgba(143, 184, 181, 0.16);
   color: var(--qp-accent);
+}
+
+.qp-btn--primary:hover:not(:disabled) {
+  background: rgba(143, 184, 181, 0.24);
 }
 
 .qp-btn:focus-visible,
