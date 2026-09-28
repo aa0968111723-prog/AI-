@@ -40,6 +40,12 @@ function clamp(n, min, max) {
   return Math.min(max, Math.max(min, value));
 }
 
+function asChannelId(value) {
+  const id = Number(value);
+  if (!Number.isInteger(id) || id < 0 || id >= CHANNEL_COUNT) return null;
+  return id;
+}
+
 function asTime(value) {
   if (value == null || value === '') return null;
   const date = value instanceof Date ? value : new Date(value);
@@ -63,9 +69,11 @@ function formatRelative(value) {
 function taskTitle(task) {
   const payload = task?.payload;
   if (payload && typeof payload === 'object') {
-    return payload.title || payload.name || payload.filename || payload.prompt || payload.label || payload.jobName || '';
+    const fromPayload = payload.title || payload.name || payload.filename || payload.prompt || payload.label || payload.jobName;
+    if (fromPayload) return fromPayload;
+  } else if (typeof payload === 'string' && payload.trim()) {
+    return payload;
   }
-  if (typeof payload === 'string' && payload.trim()) return payload;
   if (task?.title) return task.title;
   const id = String(task?.id || '');
   return id ? `任務 ${id.slice(0, 8)}` : '未命名任務';
@@ -91,8 +99,8 @@ function emptyChannels() {
 function channelsFromTasks(tasks = []) {
   const channels = emptyChannels();
   for (const task of tasks) {
-    if (!Number.isInteger(Number(task.channelId))) continue;
-    const id = clamp(task.channelId, 0, CHANNEL_COUNT - 1);
+    const id = asChannelId(task.channelId);
+    if (id == null) continue;
     const channel = channels[id];
     if (task.status === 'running' && !channel.running) channel.running = task;
     else if (task.status === 'waiting') channel.waiting.push(task);
@@ -109,9 +117,8 @@ function normalizeChannels(input) {
   if (!Array.isArray(input) || input.length === 0) return emptyChannels();
   const base = emptyChannels();
   for (const raw of input) {
-    const rawId = raw.channelId ?? raw.id;
-    if (!Number.isInteger(Number(rawId))) continue;
-    const id = clamp(rawId, 0, CHANNEL_COUNT - 1);
+    const id = asChannelId(raw.channelId ?? raw.id);
+    if (id == null) continue;
     const runningList = raw.running ? (Array.isArray(raw.running) ? raw.running : [raw.running]) : [];
     const running = runningList.find(Boolean) || null;
     const waiting = Array.isArray(raw.waiting) ? [...raw.waiting] : [];
@@ -293,8 +300,8 @@ function ChannelCard({ channel, name, pendingIds, canCancel, onCancel }) {
           </p>
         </div>
         <div className="qp-channel__meters">
-          <CapacityBar value={used} max={MAX_RUNNING_PER_CHANNEL} tone={used ? 'running' : 'accent'} label={`${name} 執行容量 ${used}/{MAX_RUNNING_PER_CHANNEL}`} />
-          <CapacityBar value={waitingCount} max={MAX_WAITING_PER_CHANNEL} tone={waitingCount >= MAX_WAITING_PER_CHANNEL ? 'warn' : 'accent'} label={`${name} 等待容量 ${waitingCount}/{MAX_WAITING_PER_CHANNEL}`} />
+          <CapacityBar value={used} max={MAX_RUNNING_PER_CHANNEL} tone={used ? 'running' : 'accent'} label={`${name} 執行容量 ${used}/${MAX_RUNNING_PER_CHANNEL}`} />
+          <CapacityBar value={waitingCount} max={MAX_WAITING_PER_CHANNEL} tone={waitingCount >= MAX_WAITING_PER_CHANNEL ? 'warn' : 'accent'} label={`${name} 等待容量 ${waitingCount}/${MAX_WAITING_PER_CHANNEL}`} />
         </div>
       </summary>
       <div className="qp-channel__body">
@@ -468,6 +475,10 @@ export default function QueuePanel({
   }, [onRetry, unmanaged, markPending]);
 
   const names = Array.from({ length: CHANNEL_COUNT }, (_, index) => channelNames[index] || `通道 ${index}`);
+  const nameOf = (channelId) => {
+    const id = asChannelId(channelId);
+    return id == null ? '未知通道' : names[id];
+  };
 
   return (
     <section className={`qp-panel ${className}`.trim()} aria-labelledby="qp-panel-title">
@@ -516,7 +527,7 @@ export default function QueuePanel({
             <ul className="qp-list">
               {resolvedFailed.map((task) => (
                 <li key={task.id}>
-                  <TaskRow task={task} channelName={names[clamp(task.channelId, 0, 9)]} pending={pendingIds.has(task.id)} showRetry={canRetry} onRetry={handleRetry} />
+                  <TaskRow task={task} channelName={nameOf(task.channelId)} pending={pendingIds.has(task.id)} showRetry={canRetry} onRetry={handleRetry} />
                 </li>
               ))}
             </ul>
@@ -531,7 +542,7 @@ export default function QueuePanel({
             <ul className="qp-list">
               {resolvedSucceeded.slice(0, 8).map((task) => (
                 <li key={task.id}>
-                  <TaskRow task={task} channelName={names[clamp(task.channelId, 0, 9)]} />
+                  <TaskRow task={task} channelName={nameOf(task.channelId)} />
                 </li>
               ))}
             </ul>
