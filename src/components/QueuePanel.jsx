@@ -1,5 +1,5 @@
 /**
- * QueuePanel — 攝影工作流代理任務使列
+ * QueuePanel — 攝影工作流代理任務佇列
  *
  * 分支：feat/queue-panel
  * 職責：只維護本檔與 QueuePanel.css。
@@ -91,6 +91,7 @@ function emptyChannels() {
 function channelsFromTasks(tasks = []) {
   const channels = emptyChannels();
   for (const task of tasks) {
+    if (!Number.isInteger(Number(task.channelId))) continue;
     const id = clamp(task.channelId, 0, CHANNEL_COUNT - 1);
     const channel = channels[id];
     if (task.status === 'running' && !channel.running) channel.running = task;
@@ -108,7 +109,9 @@ function normalizeChannels(input) {
   if (!Array.isArray(input) || input.length === 0) return emptyChannels();
   const base = emptyChannels();
   for (const raw of input) {
-    const id = clamp(raw.channelId ?? raw.id, 0, CHANNEL_COUNT - 1);
+    const rawId = raw.channelId ?? raw.id;
+    if (!Number.isInteger(Number(rawId))) continue;
+    const id = clamp(rawId, 0, CHANNEL_COUNT - 1);
     const runningList = raw.running ? (Array.isArray(raw.running) ? raw.running : [raw.running]) : [];
     const running = runningList.find(Boolean) || null;
     const waiting = Array.isArray(raw.waiting) ? [...raw.waiting] : [];
@@ -170,7 +173,7 @@ function buildDemoSnapshot() {
     },
   ];
   const filled = normalizeChannels(channels);
-  const waiting = filled.flatMap((ch) => ch.waiting);
+  const waitingTasks = filled.flatMap((ch) => ch.waiting);
   const running = filled.map((ch) => ch.running).filter(Boolean);
   const succeeded = [
     task({ id: 'ok-01', channelId: 4, status: 'succeeded', finishedAt: iso(180000), payload: { title: '進場儀式 · 主圖精修' }, enqueueSeq: 4 }),
@@ -186,8 +189,8 @@ function buildDemoSnapshot() {
     savedAt: new Date(now).toISOString(),
     nextEnqueueSeq: 32,
     runningCount: running.length,
-    waitingCount: waiting.length,
-    tasks: [...running, ...waiting, ...succeeded, ...failed],
+    waitingCount: waitingTasks.length,
+    tasks: [...running, ...waitingTasks, ...succeeded, ...failed],
     channels: filled,
     succeeded,
     failed,
@@ -278,8 +281,9 @@ function ChannelCard({ channel, name, pendingIds, canCancel, onCancel }) {
   const used = running ? 1 : 0;
   const waitingCount = channel.waitingCount ?? waiting.length;
   const busy = Boolean(running) || waiting.length > 0;
+  const hiddenWaiting = Math.max(0, (channel.waiting || []).length - waiting.length);
   return (
-    <details className={`qp-channel ${used ? 'qp-channel--busy' : ''}`} open={busy}>
+    <details className={`qp-channel${busy ? ' qp-channel--busy' : ''}`} open={busy}>
       <summary className="qp-channel__summary">
         <div className="qp-channel__id">CH {channel.channelId}</div>
         <div className="qp-channel__copy">
@@ -289,8 +293,8 @@ function ChannelCard({ channel, name, pendingIds, canCancel, onCancel }) {
           </p>
         </div>
         <div className="qp-channel__meters">
-          <CapacityBar value={used} max={MAX_RUNNING_PER_CHANNEL} tone={used ? 'running' : 'accent'} label={`${name} 執行容量 ${used}/${MAX_RUNNING_PER_CHANNEL}`} />
-          <CapacityBar value={waitingCount} max={MAX_WAITING_PER_CHANNEL} tone={waitingCount >= MAX_WAITING_PER_CHANNEL ? 'warn' : 'accent'} label={`${name} 等待容量 ${waitingCount}/${MAX_WAITING_PER_CHANNEL}`} />
+          <CapacityBar value={used} max={MAX_RUNNING_PER_CHANNEL} tone={used ? 'running' : 'accent'} label={`${name} 執行容量 ${used}/{MAX_RUNNING_PER_CHANNEL}`} />
+          <CapacityBar value={waitingCount} max={MAX_WAITING_PER_CHANNEL} tone={waitingCount >= MAX_WAITING_PER_CHANNEL ? 'warn' : 'accent'} label={`${name} 等待容量 ${waitingCount}/{MAX_WAITING_PER_CHANNEL}`} />
         </div>
       </summary>
       <div className="qp-channel__body">
@@ -298,7 +302,7 @@ function ChannelCard({ channel, name, pendingIds, canCancel, onCancel }) {
         {running ? <TaskRow task={running} channelName={name} /> : <p className="qp-empty qp-empty--compact">此通道目前沒有執行中的任務</p>}
         <p className="qp-channel__label">等待中（最多 {MAX_WAITING_PER_CHANNEL} 筆）</p>
         {waiting.length === 0 ? (
-          <p className="qp-empty qp-empty--compact">使列是空的</p>
+          <p className="qp-empty qp-empty--compact">佇列是空的</p>
         ) : (
           <ul className="qp-list">
             {waiting.map((task, index) => (
@@ -308,6 +312,7 @@ function ChannelCard({ channel, name, pendingIds, canCancel, onCancel }) {
             ))}
           </ul>
         )}
+        {hiddenWaiting > 0 ? <p className="qp-more">另有 {hiddenWaiting} 筆未顯示</p> : null}
       </div>
     </details>
   );
@@ -334,13 +339,23 @@ export default function QueuePanel({
   const [pendingIds, setPendingIds] = useState(() => new Set());
   const source = snapshot || localSnapshot;
 
+  const flattened = useMemo(
+    () => [
+      ...(Array.isArray(waiting) ? waiting : []),
+      ...(Array.isArray(completed) ? completed : []),
+      ...(Array.isArray(failed) ? failed : []),
+    ],
+    [waiting, completed, failed],
+  );
+
   const resolvedChannels = useMemo(() => {
     if (channels) return normalizeChannels(channels);
     if (source?.channels) return normalizeChannels(source.channels);
     if (tasks) return channelsFromTasks(tasks);
     if (source?.tasks) return channelsFromTasks(source.tasks);
+    if (flattened.length) return channelsFromTasks(flattened);
     return emptyChannels();
-  }, [channels, tasks, source]);
+  }, [channels, tasks, source, flattened]);
 
   const allTasks = useMemo(() => {
     if (Array.isArray(tasks) && tasks.length) return tasks;
@@ -350,8 +365,9 @@ export default function QueuePanel({
       if (channel.running) collected.push(channel.running);
       collected.push(...(channel.waiting || []));
     }
+    collected.push(...flattened);
     return collected;
-  }, [tasks, source, resolvedChannels]);
+  }, [tasks, source, resolvedChannels, flattened]);
 
   const resolvedFailed = useMemo(() => {
     if (Array.isArray(failed)) return failed;
@@ -360,9 +376,16 @@ export default function QueuePanel({
   }, [failed, source, allTasks]);
 
   const resolvedSucceeded = useMemo(() => {
-    if (Array.isArray(completed)) return completed;
-    if (Array.isArray(source?.succeeded)) return source.succeeded;
-    return allTasks.filter((task) => task.status === 'succeeded' || task.status === 'completed');
+    const list = Array.isArray(completed)
+      ? completed
+      : Array.isArray(source?.succeeded)
+        ? source.succeeded
+        : allTasks.filter((task) => task.status === 'succeeded' || task.status === 'completed');
+    return [...list].sort((a, b) => {
+      const ta = new Date(a.finishedAt || a.updatedAt || 0).getTime();
+      const tb = new Date(b.finishedAt || b.updatedAt || 0).getTime();
+      return tb - ta;
+    });
   }, [completed, source, allTasks]);
 
   const runningCount = stats?.running ?? source?.runningCount ?? resolvedChannels.reduce((sum, channel) => sum + (channel.running ? 1 : 0), 0);
@@ -388,14 +411,19 @@ export default function QueuePanel({
       if (onCancel) await onCancel(taskId);
       if (unmanaged) {
         setLocalSnapshot((prev) => {
-          const nextTasks = (prev?.tasks || []).filter((task) => task.id !== taskId);
+          const stamp = new Date().toISOString();
+          const nextTasks = (prev?.tasks || []).map((task) =>
+            task.id === taskId && task.status === 'waiting'
+              ? { ...task, status: 'cancelled', updatedAt: stamp, finishedAt: stamp }
+              : task,
+          );
           return {
             ...prev,
             tasks: nextTasks,
             channels: channelsFromTasks(nextTasks),
             waitingCount: nextTasks.filter((task) => task.status === 'waiting').length,
             runningCount: nextTasks.filter((task) => task.status === 'running').length,
-            failed: (prev?.failed || []).filter((task) => task.id !== taskId),
+            failed: prev?.failed || [],
             succeeded: prev?.succeeded || [],
           };
         });
@@ -446,11 +474,11 @@ export default function QueuePanel({
       <header className="qp-hero">
         <div className="qp-hero__copy">
           <p className="qp-kicker">攝影工作流代理</p>
-          <h2 id="qp-panel-title" className="qp-title">任務使列</h2>
+          <h2 id="qp-panel-title" className="qp-title">任務佇列</h2>
           <p className="qp-subtitle">10 條通道各 1 個執行槽、各 10 筆等待；全域並行 {parallelCap}、等待 {waitingCap}。</p>
         </div>
       </header>
-      <div className="qp-stats" role="group" aria-label="全域使列統計" aria-live="polite">
+      <div className="qp-stats" role="group" aria-label="全域佇列統計" aria-live="polite">
         <article className="qp-stat">
           <div className="qp-stat__label">目前並行</div>
           <div className="qp-stat__value"><strong>{runningCount}</strong><span> / {parallelCap}</span></div>
@@ -464,7 +492,7 @@ export default function QueuePanel({
         <article className="qp-stat">
           <div className="qp-stat__label">已完成</div>
           <div className="qp-stat__value"><strong>{completedCount}</strong></div>
-          <p className="qp-stat__hint">succeeded 累計</p>
+          <p className="qp-stat__hint">累計成功筆數</p>
         </article>
       </div>
       <section className="qp-block" aria-labelledby="qp-channels-title">
