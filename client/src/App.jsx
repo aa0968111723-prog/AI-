@@ -1,6 +1,8 @@
 import { NavLink, Route, Routes } from "react-router-dom";
 import Dashboard from "./pages/Dashboard.jsx";
 import ModulePage from "./pages/ModulePage.jsx";
+import QueuePage from "./pages/QueuePage.jsx";
+import ConversationPage from "./pages/ConversationPage.jsx";
 
 const LINKS = [
   ["/", "總覽"],
@@ -13,6 +15,8 @@ const LINKS = [
   ["/color", "色彩"],
   ["/export", "匯出"],
   ["/gallery", "相簿"],
+  ["/queue", "併列"],
+  ["/conversation", "對話"],
 ];
 
 export default function App() {
@@ -34,6 +38,8 @@ export default function App() {
       <main className="main">
         <Routes>
           <Route path="/" element={<Dashboard />} />
+          <Route path="/queue" element={<QueuePage />} />
+          <Route path="/conversation" element={<ConversationPage />} />
           <Route path="/:moduleId" element={<ModulePage />} />
         </Routes>
       </main>
