@@ -1,0 +1,144 @@
+/* src/styles/tokens.css
+   Photography production console — dark material tokens.
+   Layout geometry lives in layout.css. */
+
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Noto+Sans+TC:wght@400;500;600&display=swap");
+
+:root {
+  color-scheme: dark;
+
+  --bg-void: #07080a;
+  --bg-console: #0d0f13;
+  --bg-raised: #141820;
+  --bg-overlay: #1b2029;
+  --bg-inset: #0a0c10;
+  --surface-glass: rgba(20, 24, 32, 0.78);
+  --surface-hover: rgba(255, 255, 255, 0.04);
+  --surface-active: rgba(232, 176, 92, 0.12);
+
+  --line-subtle: rgba(255, 255, 255, 0.06);
+  --line-strong: rgba(255, 255, 255, 0.12);
+  --line-focus: rgba(232, 176, 92, 0.55);
+
+  --text-primary: #f3f1ec;
+  --text-secondary: #b7b3aa;
+  --text-tertiary: #7c7870;
+  --text-inverse: #0d0f13;
+
+  --accent: #e8b05c;
+  --accent-soft: rgba(232, 176, 92, 0.14);
+  --accent-strong: #f0c57a;
+
+  --signal-live: #e24b4b;
+  --signal-ready: #6fbf8a;
+  --signal-warn: #e8b05c;
+  --signal-idle: #5a6573;
+  --channel-mark: #8aa0b8;
+
+  --font-sans: "IBM Plex Sans", "Noto Sans TC", "Source Han Sans TC", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Instrument Sans", "IBM Plex Sans", "Noto Sans TC", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --fs-micro: 0.6875rem;
+  --fs-caption: 0.75rem;
+  --fs-body: 0.875rem;
+  --fs-ui: 0.9375rem;
+  --fs-title: 1.125rem;
+  --fs-display: 1.5rem;
+  --fs-hero: 2rem;
+
+  --lh-tight: 1.2;
+  --lh-body: 1.5;
+  --tracking-ui: 0.04em;
+  --tracking-display: -0.02em;
+
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+
+  --radius-s: 6px;
+  --radius-m: 10px;
+  --radius-l: 16px;
+
+  --shadow-console: 0 12px 40px rgba(0, 0, 0, 0.45);
+  --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+
+  --sidebar-width: 240px;
+  --header-height: 56px;
+  --bottom-nav-height: 64px;
+  --bp-tablet: 768px;
+  --bp-desktop: 1100px;
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --duration-fast: 120ms;
+  --duration: 220ms;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+  height: 100%;
+}
+
+html {
+  background: var(--bg-void);
+}
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(1200px 600px at 0% 0%, rgba(232, 176, 92, 0.05), transparent 55%),
+    radial-gradient(900px 500px at 100% 100%, rgba(138, 160, 184, 0.06), transparent 50%),
+    var(--bg-void);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--fs-body);
+  font-weight: var(--fw-regular);
+  line-height: var(--lh-body);
+  letter-spacing: 0.01em;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--line-focus);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: var(--accent-soft);
+  color: var(--text-primary);
+}
