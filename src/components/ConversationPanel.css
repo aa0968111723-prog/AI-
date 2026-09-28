@@ -1,0 +1,387 @@
+/* ConversationPanel — dedicated styles. Prefix: conversation-panel / cp- */
+
+.conversation-panel {
+  --cp-bg: var(--bg-console, #0d0f13);
+  --cp-void: var(--bg-void, #07080a);
+  --cp-raised: var(--bg-raised, #141820);
+  --cp-overlay: var(--bg-overlay, #1b2029);
+  --cp-inset: var(--bg-inset, #0a0c10);
+  --cp-text: var(--text-primary, #f3f1ec);
+  --cp-muted: var(--text-secondary, #b7b3aa);
+  --cp-faint: var(--text-tertiary, #7c7870);
+  --cp-line: var(--line-subtle, rgba(255, 255, 255, 0.06));
+  --cp-line-strong: var(--line-strong, rgba(255, 255, 255, 0.12));
+  --cp-focus: var(--line-focus, rgba(232, 176, 92, 0.55));
+  --cp-accent: var(--accent, #e8b05c);
+  --cp-accent-soft: var(--accent-soft, rgba(232, 176, 92, 0.14));
+  --cp-accent-strong: var(--accent-strong, #f0c57a);
+  --cp-live: var(--signal-live, #e24b4b);
+  --cp-ready: var(--signal-ready, #6fbf8a);
+  --cp-warn: var(--signal-warn, #e8b05c);
+  --cp-mark: var(--channel-mark, #8aa0b8);
+  --cp-sans: var(--font-sans, "IBM Plex Sans", "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif);
+  --cp-display: var(--font-display, "Instrument Sans", "IBM Plex Sans", "Noto Sans TC", sans-serif);
+  --cp-mono: var(--font-mono, "IBM Plex Mono", ui-monospace, monospace);
+  --cp-radius: var(--radius-m, 10px);
+  --cp-radius-s: var(--radius-s, 6px);
+
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  min-height: 100%;
+  max-width: 1120px;
+  color: var(--cp-text);
+  font-family: var(--cp-sans);
+}
+
+.conversation-panel *,
+.conversation-panel *::before,
+.conversation-panel *::after {
+  box-sizing: border-box;
+}
+
+.cp-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.cp-kicker {
+  margin: 0 0 4px;
+  color: var(--cp-accent);
+  font-family: var(--cp-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.cp-title {
+  margin: 0;
+  font-family: var(--cp-display);
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.cp-lede {
+  margin: 6px 0 0;
+  max-width: 42rem;
+  color: var(--cp-muted);
+  font-size: 0.9375rem;
+}
+
+.cp-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  border: 1px solid var(--cp-line);
+  border-radius: 999px;
+  background: var(--cp-inset);
+  color: var(--cp-muted);
+  font-family: var(--cp-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.cp-status.is-busy {
+  color: var(--cp-accent-strong);
+  border-color: var(--cp-focus);
+}
+
+.cp-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--cp-mark);
+}
+
+.cp-status.is-busy .cp-status-dot {
+  background: var(--cp-accent);
+  box-shadow: 0 0 0 4px var(--cp-accent-soft);
+  animation: cp-pulse 1.6s ease-out infinite;
+}
+
+.cp-channels {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.cp-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 92px;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--cp-radius-s);
+  background: transparent;
+  color: var(--cp-muted);
+  text-align: left;
+  cursor: pointer;
+}
+
+.cp-chip:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--cp-text);
+}
+
+.cp-chip.is-active {
+  background: var(--cp-accent-soft);
+  border-color: var(--cp-focus);
+  color: var(--cp-text);
+}
+
+.cp-chip.is-busy .cp-chip-index {
+  color: var(--cp-accent);
+}
+
+.cp-chip.is-error {
+  border-color: rgba(226, 75, 75, 0.35);
+}
+
+.cp-chip-index {
+  font-family: var(--cp-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--cp-mark);
+}
+
+.cp-chip.is-active .cp-chip-index {
+  color: var(--cp-accent);
+}
+
+.cp-chip-label {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.cp-chip-meta {
+  color: var(--cp-faint);
+  font-size: 11px;
+}
+
+.cp-banner {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: var(--cp-radius-s);
+  font-size: 13px;
+}
+
+.cp-banner.is-error {
+  border: 1px solid rgba(226, 75, 75, 0.35);
+  background: rgba(226, 75, 75, 0.1);
+  color: #f0b4b4;
+}
+
+.cp-banner.is-info {
+  border: 1px solid var(--cp-line-strong);
+  background: var(--cp-raised);
+  color: var(--cp-muted);
+}
+
+.cp-thread {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+  min-height: 240px;
+  max-height: min(56vh, 560px);
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid var(--cp-line);
+  border-radius: var(--cp-radius);
+  background: var(--cp-inset);
+}
+
+.cp-empty {
+  margin: auto;
+  color: var(--cp-faint);
+  font-size: 13px;
+  text-align: center;
+}
+
+.cp-msg {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: min(72ch, 86%);
+  padding: 10px 12px;
+  border: 1px solid var(--cp-line);
+  border-radius: var(--cp-radius);
+  background: var(--cp-raised);
+}
+
+.cp-msg.is-user {
+  align-self: flex-end;
+  background: var(--cp-overlay);
+}
+
+.cp-msg.is-agent {
+  align-self: flex-start;
+}
+
+.cp-msg.is-running {
+  border-color: var(--cp-focus);
+}
+
+.cp-msg.is-error {
+  border-color: rgba(226, 75, 75, 0.4);
+}
+
+.cp-msg-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  color: var(--cp-faint);
+  font-family: var(--cp-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+
+.cp-msg-body {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.9375rem;
+  line-height: 1.55;
+}
+
+.cp-msg-error {
+  margin: 0;
+  color: #f0b4b4;
+  font-family: var(--cp-mono);
+  font-size: 12px;
+}
+
+.cp-copy {
+  margin-left: auto;
+  padding: 2px 8px;
+  border: 1px solid var(--cp-line-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--cp-muted);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.cp-copy:hover,
+.cp-copy.is-copied {
+  border-color: var(--cp-focus);
+  color: var(--cp-accent-strong);
+}
+
+.cp-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--cp-line);
+  border-radius: var(--cp-radius);
+  background: var(--cp-raised);
+}
+
+.cp-input {
+  width: 100%;
+  min-height: 88px;
+  resize: vertical;
+  padding: 10px 12px;
+  border: 1px solid var(--cp-line-strong);
+  border-radius: var(--cp-radius-s);
+  background: var(--cp-inset);
+  color: var(--cp-text);
+  font: inherit;
+  line-height: 1.5;
+}
+
+.cp-input:focus-visible,
+.cp-chip:focus-visible,
+.cp-copy:focus-visible,
+.cp-send:focus-visible,
+.cp-send-all:focus-visible {
+  outline: 2px solid var(--cp-focus);
+  outline-offset: 2px;
+}
+
+.cp-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.cp-hint {
+  margin-right: auto;
+  color: var(--cp-faint);
+  font-size: 12px;
+}
+
+.cp-send,
+.cp-send-all {
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: var(--cp-radius-s);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.cp-send {
+  border: 1px solid var(--cp-focus);
+  background: var(--cp-accent-soft);
+  color: var(--cp-accent-strong);
+}
+
+.cp-send-all {
+  border: 1px solid var(--cp-line-strong);
+  background: var(--cp-overlay);
+  color: var(--cp-text);
+}
+
+.cp-send:disabled,
+.cp-send-all:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+@keyframes cp-pulse {
+  0% { box-shadow: 0 0 0 0 var(--cp-accent-soft); }
+  70% { box-shadow: 0 0 0 7px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+@media (max-width: 767px) {
+  .cp-title {
+    font-size: 1.125rem;
+  }
+
+  .cp-msg {
+    max-width: 100%;
+  }
+
+  .cp-hint {
+    flex-basis: 100%;
+    margin-right: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cp-status.is-busy .cp-status-dot {
+    animation: none;
+  }
+}
