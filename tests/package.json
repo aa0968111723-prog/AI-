@@ -1,0 +1,18 @@
+{
+  "name": "@ai/scheduler-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --import tsx --test scheduler/*.test.ts frontend/*.test.ts",
+    "test:invariants": "node --import tsx --test scheduler/invariants.test.ts",
+    "test:frontend": "node --import tsx --test frontend/*.test.ts"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}
