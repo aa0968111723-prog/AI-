@@ -1,145 +1,38 @@
 /**
- * QueuePanel — 攝影代理任務佇列面板
+ * QueuePanel — 攝影工作流代理任務使列
  *
- * Branch ownership: feat/queue-panel
- * Files: src/components/QueuePanel.jsx + src/components/QueuePanel.css
+ * 分支：feat/queue-panel
+ * 職責：只維護本檔與 QueuePanel.css。
  *
- * Presentational panel for multi-channel job queues.
- * Mutations stay in the parent via onCancel / onRetry so other branches
- * can wire a store or API without editing this file.
+ * 對齊 feat/scheduler-engine
+ *   CHANNEL_COUNT = 10
+ *   MAX_RUNNING_PER_CHANNEL = 1
+ *   MAX_WAITING_PER_CHANNEL = 10
+ *   全域並行 10，全域等待 100
  *
- * Task:
- *   {
- *     id: string,
- *     title: string,
- *     channelId?: string,
- *     channelName?: string,
- *     status?: 'running' | 'waiting' | 'completed' | 'failed',
- *     order?: number,
- *     progress?: number,
- *     error?: string,
- *     createdAt?: string | number,
- *     startedAt?: string | number,
- *     finishedAt?: string | number
- *   }
- *
- * Channel:
- *   { id, name, capacity?: number, running?: Task[] }
- *
- * Props:
- *   channels, running, waiting, completed, failed, stats,
- *   maxParallel, maxWaiting, onCancel(taskId), onRetry(taskId), className
+ * TaskStatus = waiting | running | succeeded | failed | cancelled
  */
 
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import './QueuePanel.css';
 
+export const CHANNEL_COUNT = 10;
 export const MAX_PARALLEL = 10;
 export const MAX_WAITING = 100;
+export const MAX_RUNNING_PER_CHANNEL = 1;
+export const MAX_WAITING_PER_CHANNEL = 10;
 export const WAITING_PREVIEW = 10;
+
+export const DEFAULT_CHANNEL_NAMES = ['進件', '編目', '篩選', '顯影', '精修', '調色', '輸出', '交付', '代理', '備援'];
 
 const STATUS_LABEL = {
   running: '執行中',
   waiting: '等待中',
+  succeeded: '已完成',
   completed: '已完成',
   failed: '失敗',
+  cancelled: '已取消',
 };
-
-const DEMO_CHANNELS = [
-  {
-    id: 'grade',
-    name: '調色',
-    capacity: 3,
-    running: [
-      {
-        id: 'r-grade-1',
-        title: 'IMG_2048 晴天色溫',
-        channelId: 'grade',
-        channelName: '調色',
-        status: 'running',
-        progress: 68,
-        startedAt: Date.now() - 72_000,
-      },
-      {
-        id: 'r-grade-2',
-        title: '婚紗紀念盤 LUT',
-        channelId: 'grade',
-        channelName: '調色',
-        status: 'running',
-        progress: 31,
-        startedAt: Date.now() - 28_000,
-      },
-    ],
-  },
-  {
-    id: 'retouch',
-    name: '精修',
-    capacity: 2,
-    running: [
-      {
-        id: 'r-retouch-1',
-        title: '人像皮膚 + 去背',
-        channelId: 'retouch',
-        channelName: '精修',
-        status: 'running',
-        progress: 91,
-        startedAt: Date.now() - 140_000,
-      },
-    ],
-  },
-  {
-    id: 'export',
-    name: '輸出',
-    capacity: 2,
-    running: [],
-  },
-  {
-    id: 'publish',
-    name: '發佈',
-    capacity: 1,
-    running: [],
-  },
-];
-
-const DEMO_WAITING = [
-  { id: 'w-01', title: '家庭寫真調色批次', channelId: 'grade', channelName: '調色', status: 'waiting', order: 1 },
-  { id: 'w-02', title: '封面海報 4K 輸出', channelId: 'export', channelName: '輸出', status: 'waiting', order: 2 },
-  { id: 'w-03', title: '夜景降噪精修', channelId: 'retouch', channelName: '精修', status: 'waiting', order: 3 },
-  { id: 'w-04', title: 'LINE 社群帖發佈', channelId: 'publish', channelName: '發佈', status: 'waiting', order: 4 },
-  { id: 'w-05', title: '產品平面紀錄調色', channelId: 'grade', channelName: '調色', status: 'waiting', order: 5 },
-  { id: 'w-06', title: '官網縮圖 WebP', channelId: 'export', channelName: '輸出', status: 'waiting', order: 6 },
-  { id: 'w-07', title: '師長謝幕去水印', channelId: 'retouch', channelName: '精修', status: 'waiting', order: 7 },
-  { id: 'w-08', title: 'IG 限時動態切割', channelId: 'export', channelName: '輸出', status: 'waiting', order: 8 },
-  { id: 'w-09', title: '圖庫備份上傳', channelId: 'publish', channelName: '發佈', status: 'waiting', order: 9 },
-  { id: 'w-10', title: '團圓合照統一白平衡', channelId: 'grade', channelName: '調色', status: 'waiting', order: 10 },
-  { id: 'w-11', title: '後補影像 TIFF 匯出', channelId: 'export', channelName: '輸出', status: 'waiting', order: 11 },
-  { id: 'w-12', title: '季度相冊 PDF', channelId: 'export', channelName: '輸出', status: 'waiting', order: 12 },
-];
-
-const DEMO_COMPLETED = [
-  { id: 'c-01', title: 'IMG_2041 已匯出', channelName: '輸出', status: 'completed', finishedAt: Date.now() - 420_000 },
-  { id: 'c-02', title: '社廟活動海報', channelName: '調色', status: 'completed', finishedAt: Date.now() - 900_000 },
-  { id: 'c-03', title: '官網首圖精修', channelName: '精修', status: 'completed', finishedAt: Date.now() - 1_260_000 },
-];
-
-const DEMO_FAILED = [
-  {
-    id: 'f-01',
-    title: '夜間降噪批次',
-    channelName: '精修',
-    status: 'failed',
-    error: '模型逾時：推理超過 90 秒未回應',
-    finishedAt: Date.now() - 180_000,
-  },
-  {
-    id: 'f-02',
-    title: 'Drive 圖庫同步',
-    channelName: '發佈',
-    status: 'failed',
-    error: '權限不足，無法寫入目標資料夾',
-    finishedAt: Date.now() - 60_000,
-  },
-];
 
 function clamp(n, min, max) {
   const value = Number(n);
@@ -147,382 +40,475 @@ function clamp(n, min, max) {
   return Math.min(max, Math.max(min, value));
 }
 
-function formatClock(value) {
-  if (value == null || value === '') return '';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
+function asTime(value) {
+  if (value == null || value === '') return null;
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
 }
 
-function isEmptyLists({ channels, running, waiting, completed, failed }) {
-  return (
-    (!channels || channels.length === 0) &&
-    (!running || running.length === 0) &&
-    (!waiting || waiting.length === 0) &&
-    (!completed || completed.length === 0) &&
-    (!failed || failed.length === 0)
-  );
+function formatRelative(value) {
+  const date = asTime(value);
+  if (!date) return '';
+  const diff = Date.now() - date.getTime();
+  if (diff < 15000) return '剛剛';
+  const sec = Math.floor(Math.max(0, diff) / 1000);
+  if (sec < 60) return `${sec} 秒前`;
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min} 分鐘前`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr} 小時前`;
+  return `${Math.floor(hr / 24)} 天前`;
 }
 
-function groupRunningByChannel(running = [], channels = []) {
-  const map = new Map();
-  channels.forEach((channel) => {
-    map.set(channel.id, [...(channel.running || [])]);
-  });
-  running.forEach((task) => {
-    const key = task.channelId || 'default';
-    if (!map.has(key)) map.set(key, []);
-    const list = map.get(key);
-    if (!list.some((item) => item.id === task.id)) list.push(task);
-  });
-  return map;
+function taskTitle(task) {
+  const payload = task?.payload;
+  if (payload && typeof payload === 'object') {
+    return payload.title || payload.name || payload.filename || payload.prompt || payload.label || payload.jobName || '';
+  }
+  if (typeof payload === 'string' && payload.trim()) return payload;
+  if (task?.title) return task.title;
+  const id = String(task?.id || '');
+  return id ? `任務 ${id.slice(0, 8)}` : '未命名任務';
 }
 
-function buildChannels(channels = [], running = []) {
-  const grouped = groupRunningByChannel(running, channels);
-  const ids = new Set([
-    ...channels.map((channel) => channel.id),
-    ...[...grouped.keys()],
-  ]);
+function taskProgress(task) {
+  const payload = task?.payload;
+  if (payload && typeof payload === 'object' && payload.progress != null) return clamp(payload.progress, 0, 100);
+  if (task?.progress != null) return clamp(task.progress, 0, 100);
+  return task?.status === 'running' ? 12 : 0;
+}
 
-  return [...ids].map((id) => {
-    const source = channels.find((channel) => channel.id === id);
-    const runningTasks = grouped.get(id) || [];
-    const capacity = Math.max(
-      1,
-      Number(source?.capacity) || runningTasks.length || 1,
-    );
-    return {
-      id,
-      name: source?.name || runningTasks[0]?.channelName || id,
-      capacity,
-      running: runningTasks,
+function emptyChannels() {
+  return Array.from({ length: CHANNEL_COUNT }, (_, channelId) => ({
+    channelId,
+    running: null,
+    waiting: [],
+    runningCount: 0,
+    waitingCount: 0,
+  }));
+}
+
+function channelsFromTasks(tasks = []) {
+  const channels = emptyChannels();
+  for (const task of tasks) {
+    const id = clamp(task.channelId, 0, CHANNEL_COUNT - 1);
+    const channel = channels[id];
+    if (task.status === 'running' && !channel.running) channel.running = task;
+    else if (task.status === 'waiting') channel.waiting.push(task);
+  }
+  for (const channel of channels) {
+    channel.waiting.sort((a, b) => (a.enqueueSeq ?? 0) - (b.enqueueSeq ?? 0));
+    channel.runningCount = channel.running ? 1 : 0;
+    channel.waitingCount = channel.waiting.length;
+  }
+  return channels;
+}
+
+function normalizeChannels(input) {
+  if (!Array.isArray(input) || input.length === 0) return emptyChannels();
+  const base = emptyChannels();
+  for (const raw of input) {
+    const id = clamp(raw.channelId ?? raw.id, 0, CHANNEL_COUNT - 1);
+    const runningList = raw.running ? (Array.isArray(raw.running) ? raw.running : [raw.running]) : [];
+    const running = runningList.find(Boolean) || null;
+    const waiting = Array.isArray(raw.waiting) ? [...raw.waiting] : [];
+    waiting.sort((a, b) => (a.enqueueSeq ?? 0) - (b.enqueueSeq ?? 0));
+    base[id] = {
+      channelId: id,
+      running,
+      waiting: waiting.slice(0, MAX_WAITING_PER_CHANNEL),
+      runningCount: running ? 1 : raw.runningCount || 0,
+      waitingCount: raw.waitingCount ?? waiting.length,
     };
-  });
+  }
+  return base;
 }
 
-function deriveStats({ channels, waiting, completed, stats, maxParallel, maxWaiting }) {
-  const runningCount = channels.reduce(
-    (sum, channel) => sum + (channel.running?.length || 0),
-    0,
-  );
+function buildDemoSnapshot() {
+  const now = Date.now();
+  const iso = (ms) => new Date(now - ms).toISOString();
+  const task = (partial) => ({
+    attempt: partial.status === 'waiting' ? 0 : 1,
+    maxAttempts: 3,
+    createdAt: iso(120000),
+    updatedAt: iso(10000),
+    enqueueSeq: 0,
+    payload: {},
+    ...partial,
+  });
+  const channels = [
+    {
+      channelId: 0,
+      running: task({ id: 'ing-21', channelId: 0, status: 'running', startedAt: iso(80000), payload: { title: '婚禮午後段 · 記憶卡匯入', progress: 64 }, enqueueSeq: 21 }),
+      waiting: [task({ id: 'ing-22', channelId: 0, status: 'waiting', payload: { title: '迎娶前段 · 補傳 RAW' }, createdAt: iso(70000), enqueueSeq: 22 })],
+    },
+    {
+      channelId: 3,
+      running: task({ id: 'dev-08', channelId: 3, status: 'running', startedAt: iso(45000), payload: { title: '教堂室內 · 曝光與白平衡', progress: 41 }, enqueueSeq: 8 }),
+      waiting: [],
+    },
+    {
+      channelId: 4,
+      running: task({ id: 'ret-14', channelId: 4, status: 'running', startedAt: iso(30000), payload: { title: '主婚紗 · 皮膚與禮服層次', progress: 78 }, enqueueSeq: 14 }),
+      waiting: [
+        task({ id: 'ret-15', channelId: 4, status: 'waiting', payload: { title: '全家福 · 合照修臉' }, createdAt: iso(55000), enqueueSeq: 15 }),
+        task({ id: 'ret-16', channelId: 4, status: 'waiting', payload: { title: '戒指特寫 · 去塵' }, createdAt: iso(40000), enqueueSeq: 16 }),
+      ],
+    },
+    {
+      channelId: 5,
+      running: task({ id: 'col-05', channelId: 5, status: 'running', startedAt: iso(18000), payload: { title: '金色時刻 · 電影調色', progress: 22 }, enqueueSeq: 5 }),
+      waiting: [task({ id: 'col-06', channelId: 5, status: 'waiting', payload: { title: '夜宴燈光 · 色溫統一' }, createdAt: iso(25000), enqueueSeq: 6 })],
+    },
+    {
+      channelId: 6,
+      running: null,
+      waiting: [
+        task({ id: 'exp-03', channelId: 6, status: 'waiting', payload: { title: '客戶預覽 JPEG · 全套匯出' }, createdAt: iso(20000), enqueueSeq: 30 }),
+        task({ id: 'exp-04', channelId: 6, status: 'waiting', payload: { title: '印刷 TIFF 300dpi' }, createdAt: iso(15000), enqueueSeq: 31 }),
+      ],
+    },
+  ];
+  const filled = normalizeChannels(channels);
+  const waiting = filled.flatMap((ch) => ch.waiting);
+  const running = filled.map((ch) => ch.running).filter(Boolean);
+  const succeeded = [
+    task({ id: 'ok-01', channelId: 4, status: 'succeeded', finishedAt: iso(180000), payload: { title: '進場儀式 · 主圖精修' }, enqueueSeq: 4 }),
+    task({ id: 'ok-02', channelId: 6, status: 'succeeded', finishedAt: iso(300000), payload: { title: '社群套版 · 1:1 / 4:5' }, enqueueSeq: 2 }),
+    task({ id: 'ok-03', channelId: 1, status: 'succeeded', finishedAt: iso(420000), payload: { title: '上午儀式 · 編目完成' }, enqueueSeq: 1 }),
+  ];
+  const failed = [
+    task({ id: 'fail-01', channelId: 3, status: 'failed', finishedAt: iso(90000), lastError: '來源解析度不足，顯影無法穩定放大', payload: { title: '舊底片掃描 · 4K 放大' }, attempt: 3, enqueueSeq: 11 }),
+    task({ id: 'fail-02', channelId: 6, status: 'failed', finishedAt: iso(240000), lastError: '通道逾時，請降低批次或重試', payload: { title: '雲端打包 · 原圖 ZIP' }, attempt: 2, enqueueSeq: 9 }),
+  ];
   return {
-    running: stats?.running ?? runningCount,
-    waiting: stats?.waiting ?? waiting.length,
-    completed: stats?.completed ?? completed.length,
-    maxParallel: stats?.maxParallel ?? maxParallel,
-    maxWaiting: stats?.maxWaiting ?? maxWaiting,
+    version: 1,
+    savedAt: new Date(now).toISOString(),
+    nextEnqueueSeq: 32,
+    runningCount: running.length,
+    waitingCount: waiting.length,
+    tasks: [...running, ...waiting, ...succeeded, ...failed],
+    channels: filled,
+    succeeded,
+    failed,
   };
 }
 
-function ProgressBar({ value = 0, max = 100, tone = 'gen', label }) {
+function CapacityBar({ value, max, tone = 'accent', label }) {
   const safeMax = Math.max(1, Number(max) || 1);
-  const ratio = clamp((Number(value) || 0) / safeMax, 0, 1);
+  const safeValue = clamp(value, 0, safeMax);
+  const pct = clamp((safeValue / safeMax) * 100, 0, 100);
+  const over = Number(value) > Number(max);
   return (
-    <div className="qp-bar" role="progressbar" aria-valuemin={0} aria-valuemax={safeMax} aria-valuenow={Math.round(ratio * safeMax)} aria-label={label}>
-      <span className={`qp-bar-fill qp-bar-fill--${tone}`} style={{ width: `${ratio * 100}%` }} />
+    <div className="qp-meter">
+      <div
+        className={`qp-meter__fill qp-meter__fill--${over ? 'danger' : tone}`}
+        style={{ width: `${pct}%` }}
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={safeMax}
+        aria-valuenow={safeValue}
+        aria-label={label}
+      />
     </div>
   );
 }
 
 function StatusBadge({ status }) {
+  const key = status === 'completed' ? 'succeeded' : status;
   return (
-    <span className={`qp-badge qp-badge--${status || 'waiting'}`}>
-      <span className="qp-badge-dot" aria-hidden="true" />
-      {STATUS_LABEL[status] || status || '等待中'}
+    <span className={`qp-badge qp-badge--${key}`}>
+      <span className="qp-badge__dot" aria-hidden="true" />
+      {STATUS_LABEL[key] || key}
     </span>
   );
 }
 
-function TaskMeta({ task }) {
-  const time = formatClock(task.startedAt || task.finishedAt || task.createdAt);
+function TaskRow({ task, order, channelName, pending, showCancel, showRetry, onCancel, onRetry }) {
+  const status = task.status === 'completed' ? 'succeeded' : task.status;
+  const progress = taskProgress(task);
+  const timeHint = formatRelative(task.finishedAt || task.startedAt || task.updatedAt || task.createdAt);
+  const error = task.lastError || task.error;
   return (
-    <p className="qp-task-meta">
-      {task.channelName ? <span>{task.channelName}</span> : null}
-      {time ? <span>{time}</span> : null}
-    </p>
-  );
-}
-
-function RunningRow({ task }) {
-  const progress = clamp(task.progress ?? 0, 0, 100);
-  return (
-    <article className="qp-task qp-task--running">
-      <div className="qp-task-head">
-        <h4 className="qp-task-title">{task.title}</h4>
-        <span className="qp-task-pct">{Math.round(progress)}%</span>
+    <article className={`qp-task qp-task--${status}`}>
+      <div className="qp-task__index" aria-hidden="true">
+        {order != null ? String(order).padStart(2, '0') : '•'}
       </div>
-      <ProgressBar value={progress} max={100} tone="gen" label={`${task.title} 進度`} />
-    </article>
-  );
-}
-
-function WaitingRow({ task, index, onCancel, canCancel }) {
-  const order = task.order ?? index + 1;
-  return (
-    <article className="qp-row">
-      <span className="qp-order" aria-label={`順序 ${order}`}>
-        {String(order).padStart(2, '0')}
-      </span>
-      <div className="qp-row-body">
-        <h4 className="qp-task-title">{task.title}</h4>
-        <TaskMeta task={task} />
+      <div className="qp-task__body">
+        <div className="qp-task__top">
+          <h3 className="qp-task__title">{taskTitle(task)}</h3>
+          <StatusBadge status={status} />
+        </div>
+        <div className="qp-task__meta">
+          <span className="qp-task__channel">{channelName}</span>
+          {timeHint ? <span className="qp-task__time">{timeHint}</span> : null}
+          {task.maxAttempts ? (
+            <span className="qp-task__attempt">嘗試 {task.attempt ?? 0}/{task.maxAttempts}</span>
+          ) : null}
+        </div>
+        {status === 'running' ? (
+          <div className="qp-task__progress">
+            <CapacityBar value={progress} max={100} tone="running" label={`${taskTitle(task)} 進度 ${Math.round(progress)}%`} />
+            <span className="qp-task__pct">{Math.round(progress)}%</span>
+          </div>
+        ) : null}
+        {status === 'failed' && error ? <p className="qp-task__error">{error}</p> : null}
       </div>
-      <button
-        type="button"
-        className="qp-btn qp-btn--ghost"
-        onClick={() => onCancel?.(task.id)}
-        disabled={!canCancel}
-        aria-label={`取消等待：${task.title}`}
-      >
-        取消
-      </button>
-    </article>
-  );
-}
-
-function ResultRow({ task, onRetry, canRetry }) {
-  const failed = task.status === 'failed';
-  return (
-    <article className={`qp-row qp-row--${failed ? 'failed' : 'completed'}`}>
-      <StatusBadge status={failed ? 'failed' : 'completed'} />
-      <div className="qp-row-body">
-        <h4 className="qp-task-title">{task.title}</h4>
-        <TaskMeta task={task} />
-        {failed && task.error ? <p className="qp-error">{task.error}</p> : null}
-      </div>
-      {failed ? (
-        <button
-          type="button"
-          className="qp-btn qp-btn--accent"
-          onClick={() => onRetry?.(task.id)}
-          disabled={!canRetry}
-          aria-label={`重試失敗：${task.title}`}
-        >
-          重試
-        </button>
+      {showCancel || showRetry ? (
+        <div className="qp-task__actions">
+          {showCancel ? (
+            <button type="button" className="qp-btn qp-btn--ghost" disabled={pending} aria-label="取消等待任務" onClick={() => onCancel(task.id)}>
+              {pending ? '取消中' : '取消'}
+            </button>
+          ) : null}
+          {showRetry ? (
+            <button type="button" className="qp-btn qp-btn--primary" disabled={pending} aria-label="重試失敗任務" onClick={() => onRetry(task.id)}>
+              {pending ? '重試中' : '重試'}
+            </button>
+          ) : null}
+        </div>
       ) : null}
     </article>
   );
 }
 
-function ChannelCard({ channel }) {
-  const used = channel.running.length;
-  const capacity = Math.max(1, channel.capacity || used || 1);
-  const idle = used === 0;
+function ChannelCard({ channel, name, pendingIds, canCancel, onCancel }) {
+  const running = channel.running;
+  const waiting = (channel.waiting || []).slice(0, MAX_WAITING_PER_CHANNEL);
+  const used = running ? 1 : 0;
+  const waitingCount = channel.waitingCount ?? waiting.length;
+  const busy = Boolean(running) || waiting.length > 0;
   return (
-    <section className={`qp-channel${idle ? ' qp-channel--idle' : ''}`}>
-      <header className="qp-channel-head">
-        <div>
-          <h3 className="qp-channel-name">{channel.name}</h3>
-          <p className="qp-channel-sub">{idle ? '空閒中' : `執行 ${used} 筆`}</p>
+    <details className={`qp-channel ${used ? 'qp-channel--busy' : ''}`} open={busy}>
+      <summary className="qp-channel__summary">
+        <div className="qp-channel__id">CH {channel.channelId}</div>
+        <div className="qp-channel__copy">
+          <h3 className="qp-channel__name">{name}</h3>
+          <p className="qp-channel__cap">
+            執行 {used}/{MAX_RUNNING_PER_CHANNEL} · 等待 {waitingCount}/{MAX_WAITING_PER_CHANNEL}
+          </p>
         </div>
-        <span className="qp-channel-cap">{used}/{capacity}</span>
-      </header>
-      <ProgressBar
-        value={used}
-        max={capacity}
-        tone={used >= capacity ? 'warn' : 'gen'}
-        label={`${channel.name} 容量 ${used}/${capacity}`}
-      />
-      {idle ? (
-        <p className="qp-empty qp-empty--compact">此通道目前沒有執行中的任務</p>
-      ) : (
-        <div className="qp-channel-tasks">
-          {channel.running.map((task) => (
-            <RunningRow key={task.id} task={task} />
-          ))}
+        <div className="qp-channel__meters">
+          <CapacityBar value={used} max={MAX_RUNNING_PER_CHANNEL} tone={used ? 'running' : 'accent'} label={`${name} 執行容量 ${used}/${MAX_RUNNING_PER_CHANNEL}`} />
+          <CapacityBar value={waitingCount} max={MAX_WAITING_PER_CHANNEL} tone={waitingCount >= MAX_WAITING_PER_CHANNEL ? 'warn' : 'accent'} label={`${name} 等待容量 ${waitingCount}/${MAX_WAITING_PER_CHANNEL}`} />
         </div>
-      )}
-    </section>
-  );
-}
-
-function StatCard({ label, value, max, tone, hint }) {
-  return (
-    <article className="qp-stat">
-      <p className="qp-stat-label">{label}</p>
-      <p className="qp-stat-value">
-        <strong>{value}</strong>
-        {max != null ? <span className="qp-stat-max">/{max}</span> : null}
-      </p>
-      {max != null ? <ProgressBar value={value} max={max} tone={tone} label={`${label} ${value}/${max}`} /> : <div className="qp-bar qp-bar--ghost" />}
-      {hint ? <p className="qp-stat-hint">{hint}</p> : null}
-    </article>
+      </summary>
+      <div className="qp-channel__body">
+        <p className="qp-channel__label">正在執行</p>
+        {running ? <TaskRow task={running} channelName={name} /> : <p className="qp-empty qp-empty--compact">此通道目前沒有執行中的任務</p>}
+        <p className="qp-channel__label">等待中（最多 {MAX_WAITING_PER_CHANNEL} 筆）</p>
+        {waiting.length === 0 ? (
+          <p className="qp-empty qp-empty--compact">使列是空的</p>
+        ) : (
+          <ul className="qp-list">
+            {waiting.map((task, index) => (
+              <li key={task.id}>
+                <TaskRow task={task} order={index + 1} channelName={name} pending={pendingIds.has(task.id)} showCancel={canCancel} onCancel={onCancel} />
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </details>
   );
 }
 
 export default function QueuePanel({
-  channels = [],
-  running = [],
-  waiting = [],
-  completed = [],
-  failed = [],
+  snapshot,
+  channels,
+  tasks,
+  waiting,
+  completed,
+  failed,
   stats,
+  channelNames = DEFAULT_CHANNEL_NAMES,
   maxParallel = MAX_PARALLEL,
   maxWaiting = MAX_WAITING,
   onCancel,
   onRetry,
   className = '',
 }) {
-  const unmanaged = isEmptyLists({ channels, running, waiting, completed, failed });
-  const [demo, setDemo] = useState(() => ({
-    channels: DEMO_CHANNELS,
-    waiting: DEMO_WAITING,
-    completed: DEMO_COMPLETED,
-    failed: DEMO_FAILED,
-  }));
+  const unmanaged = snapshot == null && channels == null && tasks == null && waiting == null && completed == null && failed == null;
+  const demo = useMemo(() => (unmanaged ? buildDemoSnapshot() : null), [unmanaged]);
+  const [localSnapshot, setLocalSnapshot] = useState(demo);
+  const [pendingIds, setPendingIds] = useState(() => new Set());
+  const source = snapshot || localSnapshot;
 
-  const model = unmanaged ? demo : { channels, waiting, completed, failed, running };
+  const resolvedChannels = useMemo(() => {
+    if (channels) return normalizeChannels(channels);
+    if (source?.channels) return normalizeChannels(source.channels);
+    if (tasks) return channelsFromTasks(tasks);
+    if (source?.tasks) return channelsFromTasks(source.tasks);
+    return emptyChannels();
+  }, [channels, tasks, source]);
 
-  const resolvedChannels = useMemo(
-    () => buildChannels(model.channels, model.running || running),
-    [model.channels, model.running, running],
-  );
-
-  const resolvedWaiting = model.waiting || [];
-  const resolvedCompleted = model.completed || [];
-  const resolvedFailed = model.failed || [];
-  const previewWaiting = resolvedWaiting.slice(0, WAITING_PREVIEW);
-  const hiddenWaiting = Math.max(0, resolvedWaiting.length - previewWaiting.length);
-
-  const board = deriveStats({
-    channels: resolvedChannels,
-    waiting: resolvedWaiting,
-    completed: resolvedCompleted,
-    stats,
-    maxParallel,
-    maxWaiting,
-  });
-
-  const handleCancel = (taskId) => {
-    if (onCancel) {
-      onCancel(taskId);
-      return;
+  const allTasks = useMemo(() => {
+    if (Array.isArray(tasks) && tasks.length) return tasks;
+    if (Array.isArray(source?.tasks) && source.tasks.length) return source.tasks;
+    const collected = [];
+    for (const channel of resolvedChannels) {
+      if (channel.running) collected.push(channel.running);
+      collected.push(...(channel.waiting || []));
     }
-    if (!unmanaged) return;
-    setDemo((current) => ({
-      ...current,
-      waiting: current.waiting.filter((task) => task.id !== taskId),
-    }));
-  };
+    return collected;
+  }, [tasks, source, resolvedChannels]);
 
-  const handleRetry = (taskId) => {
-    if (onRetry) {
-      onRetry(taskId);
-      return;
-    }
-    if (!unmanaged) return;
-    setDemo((current) => {
-      const target = current.failed.find((task) => task.id === taskId);
-      if (!target) return current;
-      const nextWaiting = [
-        ...current.waiting,
-        {
-          ...target,
-          status: 'waiting',
-          error: undefined,
-          order: current.waiting.length + 1,
-        },
-      ];
-      return {
-        ...current,
-        failed: current.failed.filter((task) => task.id !== taskId),
-        waiting: nextWaiting,
-      };
+  const resolvedFailed = useMemo(() => {
+    if (Array.isArray(failed)) return failed;
+    if (Array.isArray(source?.failed)) return source.failed;
+    return allTasks.filter((task) => task.status === 'failed');
+  }, [failed, source, allTasks]);
+
+  const resolvedSucceeded = useMemo(() => {
+    if (Array.isArray(completed)) return completed;
+    if (Array.isArray(source?.succeeded)) return source.succeeded;
+    return allTasks.filter((task) => task.status === 'succeeded' || task.status === 'completed');
+  }, [completed, source, allTasks]);
+
+  const runningCount = stats?.running ?? source?.runningCount ?? resolvedChannels.reduce((sum, channel) => sum + (channel.running ? 1 : 0), 0);
+  const waitingCount = stats?.waiting ?? source?.waitingCount ?? resolvedChannels.reduce((sum, channel) => sum + (channel.waitingCount ?? channel.waiting.length), 0);
+  const completedCount = stats?.completed ?? resolvedSucceeded.length;
+  const parallelCap = stats?.maxParallel ?? maxParallel;
+  const waitingCap = stats?.maxWaiting ?? maxWaiting;
+  const canCancel = unmanaged || typeof onCancel === 'function';
+  const canRetry = unmanaged || typeof onRetry === 'function';
+
+  const markPending = useCallback((id, on) => {
+    setPendingIds((prev) => {
+      const next = new Set(prev);
+      if (on) next.add(id);
+      else next.delete(id);
+      return next;
     });
-  };
+  }, []);
 
-  const canCancel = Boolean(onCancel) || unmanaged;
-  const canRetry = Boolean(onRetry) || unmanaged;
-  const results = [
-    ...resolvedFailed,
-    ...resolvedCompleted,
-  ];
+  const handleCancel = useCallback(async (taskId) => {
+    markPending(taskId, true);
+    try {
+      if (onCancel) await onCancel(taskId);
+      if (unmanaged) {
+        setLocalSnapshot((prev) => {
+          const nextTasks = (prev?.tasks || []).filter((task) => task.id !== taskId);
+          return {
+            ...prev,
+            tasks: nextTasks,
+            channels: channelsFromTasks(nextTasks),
+            waitingCount: nextTasks.filter((task) => task.status === 'waiting').length,
+            runningCount: nextTasks.filter((task) => task.status === 'running').length,
+            failed: (prev?.failed || []).filter((task) => task.id !== taskId),
+            succeeded: prev?.succeeded || [],
+          };
+        });
+      }
+    } finally {
+      markPending(taskId, false);
+    }
+  }, [onCancel, unmanaged, markPending]);
+
+  const handleRetry = useCallback(async (taskId) => {
+    markPending(taskId, true);
+    try {
+      if (onRetry) await onRetry(taskId);
+      if (unmanaged) {
+        setLocalSnapshot((prev) => {
+          const target = [...(prev?.failed || []), ...(prev?.tasks || [])].find((task) => task.id === taskId);
+          if (!target) return prev;
+          const retried = {
+            ...target,
+            status: 'waiting',
+            lastError: undefined,
+            attempt: target.attempt || 0,
+            updatedAt: new Date().toISOString(),
+            enqueueSeq: prev?.nextEnqueueSeq || 1,
+          };
+          const nextTasks = [...(prev?.tasks || []).filter((task) => task.id !== taskId), retried];
+          return {
+            ...prev,
+            nextEnqueueSeq: (prev?.nextEnqueueSeq || 1) + 1,
+            tasks: nextTasks,
+            channels: channelsFromTasks(nextTasks),
+            failed: (prev?.failed || []).filter((task) => task.id !== taskId),
+            succeeded: prev?.succeeded || [],
+            waitingCount: nextTasks.filter((task) => task.status === 'waiting').length,
+            runningCount: nextTasks.filter((task) => task.status === 'running').length,
+          };
+        });
+      }
+    } finally {
+      markPending(taskId, false);
+    }
+  }, [onRetry, unmanaged, markPending]);
+
+  const names = Array.from({ length: CHANNEL_COUNT }, (_, index) => channelNames[index] || `通道 ${index}`);
 
   return (
-    <section className={`qp ${className}`.trim()} aria-labelledby="qp-title">
-      <header className="qp-header">
-        <div>
-          <p className="qp-kicker">攝影代理</p>
-          <h2 id="qp-title" className="qp-title">任務佇列</h2>
+    <section className={`qp-panel ${className}`.trim()} aria-labelledby="qp-panel-title">
+      <header className="qp-hero">
+        <div className="qp-hero__copy">
+          <p className="qp-kicker">攝影工作流代理</p>
+          <h2 id="qp-panel-title" className="qp-title">任務使列</h2>
+          <p className="qp-subtitle">10 條通道各 1 個執行槽、各 10 筆等待；全域並行 {parallelCap}、等待 {waitingCap}。</p>
         </div>
-        <span className="qp-live">
-          <span className="qp-live-dot" aria-hidden="true" />
-          即時
-        </span>
       </header>
-
-      <div className="qp-stats" aria-live="polite">
-        <StatCard label="目前並行" value={board.running} max={board.maxParallel} tone={board.running >= board.maxParallel ? 'warn' : 'gen'} hint="全局最大 10 條並行" />
-        <StatCard label="等待中" value={board.waiting} max={board.maxWaiting} tone={board.waiting >= board.maxWaiting ? 'danger' : 'warn'} hint="佇列容量 100 筆" />
-        <StatCard label="已完成" value={board.completed} tone="good" hint="累計完成筆數" />
+      <div className="qp-stats" role="group" aria-label="全域使列統計" aria-live="polite">
+        <article className="qp-stat">
+          <div className="qp-stat__label">目前並行</div>
+          <div className="qp-stat__value"><strong>{runningCount}</strong><span> / {parallelCap}</span></div>
+          <CapacityBar value={runningCount} max={parallelCap} tone={runningCount >= parallelCap ? 'warn' : 'accent'} label={`目前並行 ${runningCount} / ${parallelCap}`} />
+        </article>
+        <article className="qp-stat">
+          <div className="qp-stat__label">等待中</div>
+          <div className="qp-stat__value"><strong>{waitingCount}</strong><span> / {waitingCap}</span></div>
+          <CapacityBar value={waitingCount} max={waitingCap} tone={waitingCount >= waitingCap ? 'danger' : waitingCount > waitingCap * 0.8 ? 'warn' : 'accent'} label={`等待中 ${waitingCount} / ${waitingCap}`} />
+        </article>
+        <article className="qp-stat">
+          <div className="qp-stat__label">已完成</div>
+          <div className="qp-stat__value"><strong>{completedCount}</strong></div>
+          <p className="qp-stat__hint">succeeded 累計</p>
+        </article>
       </div>
-
-      <div className="qp-section">
-        <div className="qp-section-head">
-          <h3 className="qp-section-title">通道執行中</h3>
-          <span className="qp-section-count">{board.running} / {board.maxParallel}</span>
+      <section className="qp-block" aria-labelledby="qp-channels-title">
+        <div className="qp-block__head">
+          <h3 id="qp-channels-title">通道狀態</h3>
+          <span className="qp-block__count">{CHANNEL_COUNT} 通道</span>
         </div>
-        {resolvedChannels.length === 0 ? (
-          <p className="qp-empty">目前沒有通道任務</p>
-        ) : (
-          <div className="qp-channel-grid">
-            {resolvedChannels.map((channel) => (
-              <ChannelCard key={channel.id} channel={channel} />
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="qp-section">
-        <div className="qp-section-head">
-          <h3 className="qp-section-title">等待任務</h3>
-          <span className="qp-section-count">
-            顯示 {previewWaiting.length} / {resolvedWaiting.length}
-          </span>
+        <div className="qp-channels">
+          {resolvedChannels.map((channel) => (
+            <ChannelCard key={channel.channelId} channel={channel} name={names[channel.channelId]} pendingIds={pendingIds} canCancel={canCancel} onCancel={handleCancel} />
+          ))}
         </div>
-        {previewWaiting.length === 0 ? (
-          <p className="qp-empty">佇列是空的</p>
-        ) : (
-          <div className="qp-list">
-            {previewWaiting.map((task, index) => (
-              <WaitingRow
-                key={task.id}
-                task={task}
-                index={index}
-                onCancel={handleCancel}
-                canCancel={canCancel}
-              />
-            ))}
+      </section>
+      <div className="qp-grid qp-grid--split">
+        <section className="qp-block" aria-labelledby="qp-failed-title">
+          <div className="qp-block__head">
+            <h3 id="qp-failed-title">失敗</h3>
+            <span className="qp-block__count">{resolvedFailed.length} 筆</span>
           </div>
-        )}
-        {hiddenWaiting > 0 ? (
-          <p className="qp-more">另有 {hiddenWaiting} 筆未顯示（上限 {board.maxWaiting}）</p>
-        ) : null}
-      </div>
-
-      <div className="qp-section">
-        <div className="qp-section-head">
-          <h3 className="qp-section-title">完成與失敗</h3>
-          <span className="qp-section-count">
-            完成 {resolvedCompleted.length} · 失敗 {resolvedFailed.length}
-          </span>
-        </div>
-        {results.length === 0 ? (
-          <p className="qp-empty">尚無完成或失敗記錄</p>
-        ) : (
-          <div className="qp-list">
-            {results.map((task) => (
-              <ResultRow
-                key={task.id}
-                task={task}
-                onRetry={handleRetry}
-                canRetry={canRetry}
-              />
-            ))}
+          {resolvedFailed.length === 0 ? <p className="qp-empty">沒有失敗任務</p> : (
+            <ul className="qp-list">
+              {resolvedFailed.map((task) => (
+                <li key={task.id}>
+                  <TaskRow task={task} channelName={names[clamp(task.channelId, 0, 9)]} pending={pendingIds.has(task.id)} showRetry={canRetry} onRetry={handleRetry} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+        <section className="qp-block" aria-labelledby="qp-done-title">
+          <div className="qp-block__head">
+            <h3 id="qp-done-title">最近完成</h3>
+            <span className="qp-block__count">{resolvedSucceeded.length} 筆</span>
           </div>
-        )}
+          {resolvedSucceeded.length === 0 ? <p className="qp-empty">尚無完成紀錄</p> : (
+            <ul className="qp-list">
+              {resolvedSucceeded.slice(0, 8).map((task) => (
+                <li key={task.id}>
+                  <TaskRow task={task} channelName={names[clamp(task.channelId, 0, 9)]} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       </div>
     </section>
   );
