@@ -1,4 +1,4 @@
-import { XAIConfigError } from "./errors.ts";
+import { XAIConfigError } from "./errors.js";
 import {
   DEFAULT_BASE_URL,
   DEFAULT_MAX_CONTEXT_MESSAGES,
@@ -9,7 +9,7 @@ import {
   VALID_REASONING_EFFORTS,
   type ReasoningEffort,
   type XAIConfig,
-} from "./types.ts";
+} from "./types.js";
 
 function readEnv(env: NodeJS.ProcessEnv, key: string): string | undefined {
   const raw = env[key];
